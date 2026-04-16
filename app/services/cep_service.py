@@ -2,9 +2,37 @@
 Serviço que busca coordenadas geograficas a partir de um cep utilizando AwesomeAPI.
 """
 
+import time
+
 import requests
 
 from app.core.config import settings
+
+_CEP_CACHE_TTL_SECONDS = 300
+_CEP_CACHE_MAX_ITEMS = 256
+_cep_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _get_cached_cep(normalized_cep: str) -> dict | None:
+    """Retorna valor em cache se não estiver expirado."""
+    cached = _cep_cache.get(normalized_cep)
+    if not cached:
+        return None
+
+    timestamp, payload = cached
+    if time.time() - timestamp > _CEP_CACHE_TTL_SECONDS:
+        _cep_cache.pop(normalized_cep, None)
+        return None
+
+    return payload
+
+
+def _set_cached_cep(normalized_cep: str, payload: dict) -> None:
+    """Atualiza cache em memória com política simples de limite."""
+    if len(_cep_cache) >= _CEP_CACHE_MAX_ITEMS:
+        oldest_key = min(_cep_cache, key=lambda key: _cep_cache[key][0])
+        _cep_cache.pop(oldest_key, None)
+    _cep_cache[normalized_cep] = (time.time(), payload)
 
 
 def validate_cep(cep: object) -> dict:
@@ -58,6 +86,10 @@ def get_info_by_cep(cep: str) -> dict:
         return validation
 
     normalized_cep = validation["cep"]
+    cached = _get_cached_cep(normalized_cep)
+    if cached is not None:
+        return cached
+
     lat = None
     lng = None
 
@@ -80,7 +112,7 @@ def get_info_by_cep(cep: str) -> dict:
                 lat = None
                 lng = None
 
-        return {
+        result = {
             "cep": data.get("cep", normalized_cep),
             "address_type": data.get("address_type", ""),
             "address_name": data.get("address_name", ""),
@@ -93,5 +125,7 @@ def get_info_by_cep(cep: str) -> dict:
             "city_ibge": data.get("city_ibge", ""),
             "ddd": data.get("ddd", ""),
         }
+        _set_cached_cep(normalized_cep, result)
+        return result
     except requests.RequestException as e:
         return {"error": f"Erro ao buscar dados de CEP: {e}"}

@@ -1,88 +1,110 @@
-# Projeto Autocapacita P2
+# Projeto Autocapacita P2 - Versão 2
 
-Backend em FastAPI com integração de IA generativa usando LangChain e LangGraph.
+Backend em FastAPI com LangChain + LangGraph, evoluído para uma arquitetura multiagente real.
 
-O projeto implementa um fluxo híbrido em que o LLM interpreta a mensagem do usuário, identifica a intenção e extrai o CEP quando necessário. A partir disso, o grafo segue por ramificações determinísticas para consultar APIs externas e devolver uma resposta estruturada e amigável.
+Nesta V2, o fluxo deixou de ser um classificador simples e passou para uma orquestração com papéis cognitivos distintos:
 
-## Objetivo
+- agente planejador
+- agente especialista de domínio
+- executor determinístico de tool
+- agente crítico/revisor
+- formatador de resposta final
 
-Demonstrar na prática:
+## Objetivo da V2
 
-- papel de LangChain na integração com o modelo
-- papel de LangGraph na orquestração do fluxo
-- diferença entre etapa inteligente e workflow determinístico
-- structured output com Pydantic
-- integração com APIs externas
-- organização em camadas no backend
+Demonstrar um fluxo híbrido robusto onde:
+
+- o LLM decide e planeja
+- agentes especializados preparam execução
+- ferramentas externas continuam fora do LLM
+- um agente crítico avalia consistência do resultado
+- a resposta final usa contexto de execução e revisão
 
 ## Stack
 
 - FastAPI
 - LangChain
 - LangGraph
-- Azure AI Foundry
+- Azure AI Foundry (Chat Model)
 - Pydantic
 - Requests
+- Pytest
 
-## Fluxo atual
+## Arquitetura Multiagente
 
-1. O usuário envia uma mensagem para o endpoint de chat.
-2. O nó `classify_intent` usa o LLM para classificar a intenção e extrair o CEP.
-3. O grafo decide de forma determinística qual caminho seguir.
-4. O nó `execute_tool` consulta a integração externa necessária.
-5. O nó `format_response` devolve uma resposta amigável e padronizada.
-
-Fluxo resumido:
+Fluxo principal:
 
 ```text
 START
- ↓
-classify_intent
- ↓
- ├── cep      → execute_tool → format_response → END
- ├── weather  → execute_tool → format_response → END
- └── unknown  → format_response → END
+    -> planner_node
+    -> route_after_planner
+            -> cep_specialist_node
+            -> weather_specialist_node
+            -> format_response (unknown)
+    -> route_after_specialist
+            -> execute_tool
+            -> format_response (dados insuficientes)
+    -> critic_node
+    -> format_response
+    -> END
 ```
+
+### Papéis dos nós
+
+1. planner_node
+
+- classifica intencao: cep, weather, unknown
+- define target_agent
+- define needs_tool e tool_name
+- extrai CEP quando aplicável
+- escreve plano no estado
+
+1. especialistas (cep_specialist_node, weather_specialist_node)
+
+- validam parâmetros de domínio
+- preparam tool_input
+- escrevem specialist_notes
+
+1. execute_tool
+
+- executor puro e determinístico
+- lê tool_name + tool_input
+- executa API/função externa
+- não toma decisão de orquestração
+
+1. critic_node
+
+- analisa tool_result/error
+- escreve critic_notes de coerência
+
+1. format_response
+
+- monta mensagem final com intent, resultado, critic_notes e erros
+- trata fallback de clima para endereço quando necessário
+
+## Melhorias da V2
+
+- estado compartilhado expandido para multiagente
+- roteamento condicional rico após planner e specialist
+- observabilidade por request_id, agent_path e agent_timings
+- cache em memória de CEP com TTL
+- fallback inteligente no fluxo weather (retorna endereço quando clima falha)
+- testes unitários e de integração para o grafo
 
 ## Estrutura do projeto
 
 ```text
 app/
- agents/      # Camada de adaptação entre serviços e modelos
- core/        # Configuração e utilitários compartilhados
- graph/       # State, nós e compilação do LangGraph
- llm/         # Cliente LangChain e prompts
- models/      # Schemas Pydantic de entrada, saída e structured output
- routes/      # Endpoints FastAPI
- services/    # Integrações externas e orquestração de aplicação
-main.py        # Inicialização da API
+    agents/      # Adaptadores entre serviços e modelos
+    core/        # Configuração e utilitários
+    graph/       # State, nós e montagem do LangGraph
+    llm/         # Cliente de LLM e prompts
+    models/      # Schemas Pydantic
+    routes/      # Endpoints FastAPI
+    services/    # Integrações externas e serviço do agente
+main.py        # App FastAPI
+tests/         # Testes unitários e integração
 ```
-
-## Arquitetura por camada
-
-### routes
-
-Recebem a requisição HTTP e delegam para os serviços.
-
-### services
-
-Concentram integração com APIs externas e a ponte entre FastAPI e o grafo.
-
-### graph
-
-Define o estado compartilhado e os nós do fluxo LangGraph.
-
-### llm
-
-Centraliza o cliente do modelo e os prompts usados no fluxo.
-
-### models
-
-Define contratos de entrada e saída da API, além do structured output do classificador.
-
-### agents
-
-Adaptam os dados retornados pelos serviços para os modelos de resposta da aplicação.
 
 ## Endpoints
 
@@ -92,24 +114,10 @@ Adaptam os dados retornados pelos serviços para os modelos de resposta da aplic
 GET /
 ```
 
-Resposta:
-
-```json
-{
- "message": "API funcionando!"
-}
-```
-
 ### Consulta de CEP
 
 ```http
 GET /api/address/{cep}
-```
-
-Exemplo:
-
-```http
-GET /api/address/01001000
 ```
 
 ### Consulta de clima por CEP
@@ -118,7 +126,7 @@ GET /api/address/01001000
 GET /api/weather?cep=01001000
 ```
 
-### Chat com roteamento inteligente
+### Chat multiagente
 
 ```http
 POST /api/agent/chat
@@ -129,38 +137,40 @@ Body:
 
 ```json
 {
- "message": "Como está o clima no CEP 01001000?"
+    "message": "Como está o clima no CEP 01001000?"
 }
 ```
 
-Resposta esperada:
+Exemplo de resposta:
 
 ```json
 {
- "intent": "weather",
- "message": "Em São Paulo - SP, o clima está com predominantemente limpo durante a noite, temperatura de 20.1°C e vento de 9.2 km/h. (Fonte: Open-Meteo (https://open-meteo.com))",
- "data": {
-  "location": {
-   "city": "São Paulo",
-   "state": "SP"
-  },
-  "time": "2026-04-15T22:45",
-  "interval": 900,
-  "temperature": 20.1,
-  "windspeed": 9.2,
-  "winddirection": 138,
-  "is_day": 0,
-  "weathercode": 1,
-  "source": "Open-Meteo (https://open-meteo.com)"
- }
+    "success": true,
+    "intent": "weather",
+    "message": "Em Sao Paulo - SP, o clima esta com ...",
+    "data": {
+        "location": {
+            "city": "Sao Paulo",
+            "state": "SP"
+        },
+        "temperature": 20.1,
+        "windspeed": 9.2,
+        "weathercode": 1,
+        "source": "Open-Meteo (https://open-meteo.com)"
+    },
+    "agent_path": [
+        "planner",
+        "weather_specialist",
+        "tool_executor",
+        "critic",
+        "formatter"
+    ]
 }
 ```
 
 ## Variáveis de ambiente
 
-O projeto usa um arquivo `.env` na raiz.
-
-Exemplo:
+Crie um arquivo .env na raiz:
 
 ```env
 AZURE_OPENAI_BASE_URL=https://seu-recurso.openai.azure.com/openai/v1
@@ -172,88 +182,51 @@ AWESOME_API_TOKEN=seu-token
 AWESOME_API_KEY_HEADER=seu-token
 ```
 
-Observação:
+Notas:
 
-- para Azure AI Foundry, o projeto usa a API unificada `/openai/v1`
-- o nome do deployment deve ser exatamente o nome configurado no Foundry
+- o endpoint de Azure usa /openai/v1
+- o nome do deployment precisa bater com o configurado no Foundry
 
 ## Instalação
 
-Crie e ative um ambiente virtual:
+Windows PowerShell:
 
 ```powershell
 py -m venv .venv
-.\.venv\Scripts\Activate.ps1
+(Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned) ; (& .venv\Scripts\Activate.ps1)
+python -m pip install -e .
+python -m pip install -e ".[dev]"
 ```
 
-Instale as dependências principais:
+## Execução da API
 
 ```powershell
-pip install -e .
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Instale também as dependências de desenvolvimento:
+Documentação interativa:
+
+- <http://127.0.0.1:8000/docs>
+- <http://127.0.0.1:8000/redoc>
+
+## Testes
+
+Rodar testes principais da V2:
 
 ```powershell
-pip install -e ".[dev]"
-```
-
-## Execução
-
-Suba a API com Uvicorn:
-
-```powershell
-uvicorn main:app --reload
-```
-
-Swagger UI:
-
-```text
-http://localhost:8000/docs
-```
-
-## Teste rápido do modelo
-
-```powershell
-python -c "from app.llm.client import get_chat_model; m=get_chat_model(); r=m.invoke('qual a capital do Brasil?'); print(r.content)"
+python -m pytest tests/test_nodes_simple.py tests/test_graph_integration.py -q
 ```
 
 ## Integrações externas
 
-### AwesomeAPI CEP
+1. AwesomeAPI CEP
 
-Usada para obter:
+- endereço, cidade, estado, DDD, latitude e longitude
 
-- endereço
-- cidade
-- estado
-- DDD
-- latitude
-- longitude
+1. Open-Meteo
 
-### Open-Meteo
+- clima atual (temperatura, vento, código meteorológico, período)
 
-Usada para obter:
+## Status da versão
 
-- temperatura atual
-- velocidade do vento
-- direção do vento
-- código meteorológico
-- período do dia
-
-## O que já está implementado
-
-- cliente LangChain conectado ao Azure AI Foundry
-- classificação de intenção com structured output
-- extração de CEP via LLM
-- roteamento determinístico no LangGraph
-- integração com CEP e clima
-- resposta estruturada no endpoint de chat
-- logs básicos de execução
-
-## Próximos passos possíveis
-
-- mover a formatação final da resposta para um nó com LLM
-- padronizar modelos de erro entre integrações
-- adicionar testes automatizados para os nós do grafo
-- desacoplar formatadores de saída em uma camada própria
+As 12 tarefas planejadas para a evolução multiagente foram implementadas nesta V2.

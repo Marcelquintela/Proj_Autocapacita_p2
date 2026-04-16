@@ -30,3 +30,7 @@ class ChatResponse(BaseModel):
             "WeatherOutput ou WeatherErrorOutput. Null quando não houver dado."
         ),
     )] = None
+    agent_path: list[str] | None = Field(
+        default=None,
+        description="Caminho percorrido pelos agentes no grafo (para debug). Ex: ['planner', 'weather_specialist', 'tool', 'critic', 'formatter']."
+    )

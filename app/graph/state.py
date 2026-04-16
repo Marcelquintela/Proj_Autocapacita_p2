@@ -1,22 +1,27 @@
 """Estado compartilhado entre os nós do grafo LangGraph."""
 
-from typing import Any
-
 from typing_extensions import TypedDict
+
+from app.models.cep_model import CepErrorOutput, CepOutput
+from app.models.weather_model import WeatherErrorOutput, WeatherOutput
+
+# União de todos os payloads possíveis produzidos pelos nós de execução
+ToolResult = CepOutput | CepErrorOutput | WeatherOutput | WeatherErrorOutput | None
 
 
 class AgentState(TypedDict):
     """Estrutura de dados que flui por todos os nós do grafo."""
 
-    # Entrada do usuário
+    # --- Entrada ---
     user_message: str
 
-    # Resultado da classificação de intenção
+    # --- Classificação ---
     intent: str
     cep: str | None
 
-    # Resultado da execução da ferramenta
-    tool_result: Any | None
+    # --- Execução ---
+    tool_result: ToolResult
+    error_message: str | None
 
-    # Resposta final formatada
+    # --- Saída ---
     response: str

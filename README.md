@@ -36,25 +36,25 @@ Fluxo resumido:
 
 ```text
 START
-	↓
+ ↓
 classify_intent
-	↓
-	├── cep      → execute_tool → format_response → END
-	├── weather  → execute_tool → format_response → END
-	└── unknown  → format_response → END
+ ↓
+ ├── cep      → execute_tool → format_response → END
+ ├── weather  → execute_tool → format_response → END
+ └── unknown  → format_response → END
 ```
 
 ## Estrutura do projeto
 
 ```text
 app/
-	agents/      # Camada de adaptação entre serviços e modelos
-	core/        # Configuração e utilitários compartilhados
-	graph/       # State, nós e compilação do LangGraph
-	llm/         # Cliente LangChain e prompts
-	models/      # Schemas Pydantic de entrada, saída e structured output
-	routes/      # Endpoints FastAPI
-	services/    # Integrações externas e orquestração de aplicação
+ agents/      # Camada de adaptação entre serviços e modelos
+ core/        # Configuração e utilitários compartilhados
+ graph/       # State, nós e compilação do LangGraph
+ llm/         # Cliente LangChain e prompts
+ models/      # Schemas Pydantic de entrada, saída e structured output
+ routes/      # Endpoints FastAPI
+ services/    # Integrações externas e orquestração de aplicação
 main.py        # Inicialização da API
 ```
 
@@ -96,7 +96,7 @@ Resposta:
 
 ```json
 {
-	"message": "API funcionando!"
+ "message": "API funcionando!"
 }
 ```
 
@@ -129,7 +129,7 @@ Body:
 
 ```json
 {
-	"message": "Como está o clima no CEP 01001000?"
+ "message": "Como está o clima no CEP 01001000?"
 }
 ```
 
@@ -137,22 +137,22 @@ Resposta esperada:
 
 ```json
 {
-	"intent": "weather",
-	"message": "Em São Paulo - SP, o clima está com predominantemente limpo durante a noite, temperatura de 20.1°C e vento de 9.2 km/h. (Fonte: Open-Meteo (https://open-meteo.com))",
-	"data": {
-		"location": {
-			"city": "São Paulo",
-			"state": "SP"
-		},
-		"time": "2026-04-15T22:45",
-		"interval": 900,
-		"temperature": 20.1,
-		"windspeed": 9.2,
-		"winddirection": 138,
-		"is_day": 0,
-		"weathercode": 1,
-		"source": "Open-Meteo (https://open-meteo.com)"
-	}
+ "intent": "weather",
+ "message": "Em São Paulo - SP, o clima está com predominantemente limpo durante a noite, temperatura de 20.1°C e vento de 9.2 km/h. (Fonte: Open-Meteo (https://open-meteo.com))",
+ "data": {
+  "location": {
+   "city": "São Paulo",
+   "state": "SP"
+  },
+  "time": "2026-04-15T22:45",
+  "interval": 900,
+  "temperature": 20.1,
+  "windspeed": 9.2,
+  "winddirection": 138,
+  "is_day": 0,
+  "weathercode": 1,
+  "source": "Open-Meteo (https://open-meteo.com)"
+ }
 }
 ```
 

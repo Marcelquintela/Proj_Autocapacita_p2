@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class IntentClassification(BaseModel):
@@ -21,8 +21,16 @@ class IntentClassification(BaseModel):
     )
     cep: str | None = Field(
         default=None,
-        description="CEP de 8 dígitos extraído da mensagem, se presente.",
+        description="CEP de 8 dígitos numéricos extraído da mensagem, sem hífen, se presente.",
     )
-    reasoning: str = Field(
-        description="Breve explicação da classificação feita."
-    )
+
+    @field_validator("cep", mode="before")
+    @classmethod
+    def normalize_and_validate_cep(cls, v: str | None) -> str | None:
+        """Remove hífen e valida que o CEP tem exatamente 8 dígitos numéricos."""
+        if v is None:
+            return None
+        normalized = v.replace("-", "").strip()
+        if not normalized.isdigit() or len(normalized) != 8:
+            return None
+        return normalized

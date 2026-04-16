@@ -1,0 +1,26 @@
+[project]
+name = "proj-autocapacita-p2"
+version = "0.1.0"
+description = "este é um projeto de teste para o curso de capacitação da Autocapacita"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+    "langchain>=0.3.0",
+    "langgraph>=0.2.0",
+    "langchain-openai>=0.2.0",
+    "httpx>=0.28.1",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=26,<27",
+    "isort>=8,<9",
+    "pydocstyle>=6.3,<7",
+    "pytest>=8,<9"
+]
+

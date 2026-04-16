@@ -44,10 +44,16 @@ START
     -> route_after_specialist
             -> execute_tool
             -> format_response (dados insuficientes)
-    -> critic_node
+    -> critic_node (sempre apos execute_tool)
     -> format_response
     -> END
 ```
+
+Observações do fluxo real:
+
+- após execute_tool, o critic_node é sempre executado, inclusive em erros técnicos
+- no fluxo weather, se clima falhar e CEP estiver disponível, há fallback para resposta de endereço
+- agent_path e agent_timings são preenchidos para observabilidade
 
 ### Papéis dos nós
 
@@ -214,7 +220,13 @@ Documentação interativa:
 Rodar testes principais da V2:
 
 ```powershell
-python -m pytest tests/test_nodes_simple.py tests/test_graph_integration.py -q
+python -m pytest tests/test_nodes.py tests/test_graph_integration.py -q
+```
+
+Rodar suíte completa do projeto:
+
+```powershell
+python -m pytest -q
 ```
 
 ## Integrações externas

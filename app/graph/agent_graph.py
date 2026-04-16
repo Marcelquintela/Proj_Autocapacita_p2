@@ -81,14 +81,11 @@ def route_after_specialist(state: AgentState) -> str:
 def route_after_tool_execution(state: AgentState) -> str:
     """
     Decide o próximo nó após a execução da ferramenta.
-    
-    Rota para:
-    - critic_node: sempre (avalia o resultado)
-    - handle_error: se houver erro crítico
+
+    Na V2 atual, sempre encaminha para o critic_node,
+    inclusive quando há erro técnico, para manter a etapa
+    de revisão/avaliação antes da resposta final.
     """
-    if state.get("error_message"):
-        # Mesmo com erro, passa para critic avaliar
-        return "critic_node"
     return "critic_node"
 
 
@@ -96,7 +93,7 @@ def build_graph() -> CompiledStateGraph:
     """Monta e compila o StateGraph com arquitetura multiagente."""
     graph = StateGraph(AgentState)
 
-    # ===== NÓSS DO GRAFO =====
+    # ===== NÓS DO GRAFO =====
     
     # Nó 1: Planner Agent - Classifica intenção e cria plano
     graph.add_node("planner_node", planner_node)

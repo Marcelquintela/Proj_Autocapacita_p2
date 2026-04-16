@@ -1,15 +1,16 @@
-"""Schemas de structured output para classificação de intenção pelo LLM."""
+"""Schemas de structured output usados pelos agentes LLM da V2 multiagente."""
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class PlannerOutput(BaseModel):
     """
     Saída estruturada do Planner Agent.
-    Define o plano de ação, qual agente especialista será chamado
-    e se ferramentas serão necessárias.
+
+    O planner decide intenção, próximo agente, necessidade de ferramenta,
+    parâmetros básicos extraídos da mensagem (como CEP) e plano textual.
     """
 
     intent: Literal["cep", "weather", "unknown"] = Field(
@@ -34,41 +35,12 @@ class PlannerOutput(BaseModel):
     )
 
 
-class IntentClassification(BaseModel):
-    """
-    Saída estruturada do nó classificador.
-    O LLM deve preencher este schema a partir da mensagem do usuário.
-    """
-
-    intent: Literal["cep", "weather", "unknown"] = Field(
-        description=(
-            "Intenção detectada na mensagem do usuário. "
-            "'cep' para consulta de endereço, "
-            "'weather' para consulta de clima, "
-            "'unknown' para qualquer outra coisa."
-        )
-    )
-    cep: str | None = Field(
-        default=None,
-        description="CEP de 8 dígitos numéricos extraído da mensagem, sem hífen, se presente.",
-    )
-
-    @field_validator("cep", mode="before") #DECORATOR QUE NORMALIZA E VALIDA O CEP ANTES DE ATRIBUIR AO CAMPO
-    @classmethod #decorator que indica que o método é um método de classe, ou seja, recebe a classe como primeiro argumento em vez de uma instância
-    def normalize_and_validate_cep(cls, v: str | None) -> str | None:
-        """Remove hífen e valida que o CEP tem exatamente 8 dígitos numéricos."""
-        if v is None:
-            return None
-        normalized = v.replace("-", "").strip()
-        if not normalized.isdigit() or len(normalized) != 8:
-            return None
-        return normalized
-
-
 class SpecialistOutput(BaseModel):
     """
     Saída estruturada de um Specialist Agent (CEP ou Weather).
-    Valida parâmetros e prepara a ferramenta para execução.
+
+    O especialista valida o contexto de domínio e prepara o tool_input
+    para execução determinística.
     """
 
     is_ready: bool = Field(
@@ -86,7 +58,9 @@ class SpecialistOutput(BaseModel):
 class CriticOutput(BaseModel):
     """
     Saída estruturada do Critic Agent.
-    Avalia o resultado da ferramenta e sugere formato de resposta.
+
+    O crítico avalia consistência semântica do resultado e sinaliza
+    o estilo recomendado para resposta final.
     """
 
     is_valid: bool = Field(
